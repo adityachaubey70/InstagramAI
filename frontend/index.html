@@ -1,0 +1,492 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram AI Studio</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <h2>✦ InstaAI</h2>
+        <p class="menu-title">WORKSPACE</p>
+
+        <a class="active" href="#">▦ Dashboard</a>
+        <a href="#generator">✍ Content Generator</a>
+        <a href="#imageCreator">🎨 Image Creator</a>
+        <a href="#carouselCreator">🎠 Carousel Creator</a>
+        <a href="#reelsCreator">🎬 Reels Creator</a>
+        <a href="#voiceoverStudio">🎙️ Voiceover Studio</a>
+        <a href="#automaticReelCreator">🎥 Automatic Reel Creator</a>
+        <a href="#reelApproval">✅ Reel Batch Approval</a>
+        <a href="#posts">▣ My Posts</a>
+        <a href="#scheduler">◷ Scheduler</a>
+        <a href="#settings">⚙ Settings</a>
+
+        <div class="sidebar-bottom">
+            Powered by Local AI<br>
+            Ollama + Qwen 2.5
+        </div>
+    </aside>
+
+    <!-- Main Dashboard -->
+    <main class="main">
+
+        <!-- Header -->
+        <header>
+            <div>
+                <h1>Instagram AI Studio</h1>
+                <p>Create smarter content with your local AI assistant.</p>
+            </div>
+
+            <span class="status">
+                <i></i> AI Backend Ready
+            </span>
+        </header>
+
+        <!-- Dashboard Statistics -->
+        <section class="stats">
+
+            <div class="stat-card">
+                <span>Total Posts</span>
+                <h2 id="totalPosts">0</h2>
+                <small>Your generated content</small>
+            </div>
+
+            <div class="stat-card">
+                <span>Pending Approval</span>
+                <h2 id="pendingPosts">0</h2>
+                <small>Waiting for your review</small>
+            </div>
+
+            <div class="stat-card">
+                <span>AI Engine</span>
+                <h2 class="online">Online</h2>
+                <small>Qwen 2.5 3B</small>
+            </div>
+
+        </section>
+
+        <!-- AI Content Generator -->
+        <section class="generator" id="generator">
+
+            <div class="section-heading">
+                <div>
+                    <h2>✦ AI Content Generator</h2>
+                    <p>Generate Instagram captions, hooks and hashtags.</p>
+                </div>
+
+                <span class="local-label">LOCAL AI</span>
+            </div>
+
+            <label for="topic">
+                What would you like to post about?
+            </label>
+
+            <textarea
+                id="topic"
+                placeholder="Example: Benefits of learning Python..."
+            ></textarea>
+
+            <label for="contentType">Content type</label>
+
+            <select id="contentType">
+                <option>Instagram caption</option>
+                <option>Educational post</option>
+                <option>Motivational post</option>
+                <option>Business promotion</option>
+                <option>Technology post</option>
+            </select>
+
+            <button id="generateBtn" onclick="generateContent()">
+                ✦ Generate Instagram Content
+            </button>
+
+            <p id="message"></p>
+
+            <div id="resultBox" class="result-box hidden">
+
+                <div class="result-heading">
+                    <h3>Generated Content</h3>
+
+                    <button class="copy-btn" onclick="copyContent()">
+                        Copy Content
+                    </button>
+                </div>
+
+                <pre id="result"></pre>
+
+                <button class="approve-btn" onclick="saveForApproval()">
+                    Save for Approval
+                </button>
+
+            </div>
+
+        </section>
+
+        <!-- Instagram Image Creator -->
+        <section class="generator" id="imageCreator">
+
+            <div class="section-heading">
+                <div>
+                    <h2>🎨 Instagram Image Creator</h2>
+                    <p>Create colorful Instagram posts using InstaAI.</p>
+                </div>
+
+                <span class="local-label">IMAGE STUDIO</span>
+            </div>
+
+            <label for="imageTopic">Post Topic</label>
+
+            <input
+                type="text"
+                id="imageTopic"
+                placeholder="Example: Python Learning"
+            >
+
+            <label for="imageTitle">Image Title</label>
+
+            <input
+                type="text"
+                id="imageTitle"
+                placeholder="Example: Learn Python Easily"
+            >
+
+            <label for="imageSubtitle">Image Subtitle</label>
+
+            <textarea
+                id="imageSubtitle"
+                placeholder="Example: Start your programming journey today!"
+            ></textarea>
+
+            <button
+                id="createImageBtn"
+                onclick="createInstagramImage()"
+            >
+                🎨 Generate Instagram Image
+            </button>
+
+            <p id="imageMessage"></p>
+
+            <div id="imagePreviewBox" class="result-box hidden">
+
+                <h3>Generated Image Preview</h3>
+
+                <img
+                    id="generatedImage"
+                    src=""
+                    alt="Generated Instagram post"
+                    style="width:100%; max-width:500px; border-radius:12px;"
+                >
+
+                <p>
+                    <a
+                        id="downloadImage"
+                        href="#"
+                        download="InstaAI_Post.png"
+                    >
+                        Download Image
+                    </a>
+                </p>
+
+            </div>
+
+        </section>
+
+        <!-- AI Carousel Creator -->
+        <section class="generator" id="carouselCreator">
+
+            <div class="section-heading">
+                <div>
+                    <h2>🎠 AI Carousel Creator</h2>
+                    <p>
+                        Generate multiple Instagram slides using local AI.
+                    </p>
+                </div>
+
+                <span class="local-label">CAROUSEL STUDIO</span>
+            </div>
+
+            <label for="carouselTopic">
+                What is your carousel about?
+            </label>
+
+            <input
+                type="text"
+                id="carouselTopic"
+                placeholder="Example: Python for Beginners"
+            >
+
+            <label for="carouselSlideCount">
+                Number of Slides
+            </label>
+
+            <select id="carouselSlideCount">
+                <option value="3">3 Slides</option>
+                <option value="4">4 Slides</option>
+                <option value="5" selected>5 Slides</option>
+                <option value="6">6 Slides</option>
+                <option value="7">7 Slides</option>
+            </select>
+
+            <button
+                id="createCarouselBtn"
+                onclick="createCarousel()"
+            >
+                🎠 Generate Instagram Carousel
+            </button>
+
+            <p id="carouselMessage"></p>
+
+            <div id="carouselPreview"></div>
+
+        </section>
+        
+<!-- AI Reels Creator -->
+<section class="generator" id="reelsCreator">
+
+    <div class="section-heading">
+        <div>
+            <h2>🎬 AI Reels Creator</h2>
+            <p>Generate Instagram Reel scripts using local AI.</p>
+        </div>
+
+        <span class="local-label">REELS STUDIO</span>
+    </div>
+
+    <label for="reelTopic">What is your Reel about?</label>
+
+    <textarea
+        id="reelTopic"
+        placeholder="Example: 5 Python Tips for Beginners..."
+    ></textarea>
+
+    <label for="reelDuration">Reel Duration</label>
+
+    <select id="reelDuration">
+        <option value="15">15 Seconds</option>
+        <option value="30" selected>30 Seconds</option>
+        <option value="45">45 Seconds</option>
+        <option value="60">60 Seconds</option>
+    </select>
+
+    <label for="reelLanguage">Reel Language</label>
+
+    <select id="reelLanguage">
+        <option value="English">English</option>
+        <option value="Hindi">Hindi</option>
+        <option value="Hinglish">Hinglish</option>
+    </select>
+
+    <button
+        id="generateReelBtn"
+        onclick="generateReelScript()"
+    >
+        🎬 Generate Reel Script
+    </button>
+
+    <p id="reelMessage"></p>
+
+    <div id="reelResultBox" class="result-box hidden">
+
+        <div class="result-heading">
+            <h3>Your Generated Reel Script</h3>
+
+            <button
+                class="copy-btn"
+                onclick="copyReelScript()"
+            >
+                Copy Script
+            </button>
+        </div>
+
+        <pre id="reelResult"></pre>
+
+    </div>
+
+</section>
+
+<section class="generator" id="voiceoverStudio">
+
+    <div class="section-heading">
+        <h2>🎙️ Voiceover Studio</h2>
+        <p>Convert your text into natural English AI voiceovers.</p>
+    </div>
+
+    <label for="voiceoverText">Enter your voiceover text</label>
+
+    <textarea
+        id="voiceoverText"
+        rows="8"
+        placeholder="Enter your Instagram Reel narration here..."
+    ></textarea>
+
+    <label for="voiceoverVoice">Select Voice</label>
+
+    <select id="voiceoverVoice">
+        <option value="female">Female - Microsoft Zira</option>
+        <option value="male">Male - Microsoft David</option>
+    </select>
+
+    <label for="voiceoverRate">Speaking Speed</label>
+
+    <select id="voiceoverRate">
+        <option value="140">Slow</option>
+        <option value="165" selected>Normal</option>
+        <option value="185">Fast</option>
+    </select>
+
+    <button id="generateVoiceoverBtn" onclick="generateVoiceover()">
+        🎙️ Generate Voiceover
+    </button>
+
+    <p id="voiceoverMessage"></p>
+
+    <div id="voiceoverResult" class="result-box hidden">
+        <h3>Your Generated Voiceover</h3>
+
+        <audio id="voiceoverPlayer" controls></audio>
+
+        <br><br>
+
+        <a id="downloadVoiceover" download="InstaAI_Voiceover.wav">
+            Download Voiceover
+        </a>
+    </div>
+
+</section>
+
+<!-- Automatic Reel Video Creator -->
+<section class="generator" id="automaticReelCreator">
+
+    <div class="section-heading">
+        <div>
+            <h2>🎥 Automatic Reel Video Creator</h2>
+            <p>Create complete Instagram Reels with AI voice and video.</p>
+        </div>
+
+        <span class="local-label">VIDEO STUDIO</span>
+    </div>
+
+    <label for="autoReelTopic">Reel Topic</label>
+
+    <input
+        type="text"
+        id="autoReelTopic"
+        placeholder="Example: 5 Python Tips for Beginners"
+    >
+
+    <label for="autoReelNarration">Reel Narration</label>
+
+    <textarea
+        id="autoReelNarration"
+        rows="8"
+        placeholder="Enter the complete narration for your Reel..."
+    ></textarea>
+
+    <label for="autoReelVoice">Select AI Voice</label>
+
+    <select id="autoReelVoice">
+        <option value="female">Female - Microsoft Zira</option>
+        <option value="male">Male - Microsoft David</option>
+    </select>
+
+    <label for="autoReelRate">Speaking Speed</label>
+
+    <select id="autoReelRate">
+        <option value="140">Slow</option>
+        <option value="165" selected>Normal</option>
+        <option value="185">Fast</option>
+    </select>
+
+    <button
+        id="createAutomaticReelBtn"
+        onclick="createAutomaticReel()"
+    >
+        🎥 Generate Complete Instagram Reel
+    </button>
+
+    <p id="autoReelMessage"></p>
+
+    <div id="autoReelResult" class="result-box hidden">
+
+        <h3>🎬 Your Instagram Reel</h3>
+
+        <video
+            id="autoReelPlayer"
+            controls
+            playsinline
+            style="width:100%; max-width:420px; border-radius:12px;"
+        ></video>
+
+        <p>
+            <a
+                id="downloadAutoReel"
+                href="#"
+                download="InstaAI_Reel.mp4"
+            >
+                ⬇ Download Instagram Reel
+            </a>
+        </p>
+
+    </div>
+
+</section>
+
+
+
+
+
+        <!-- Reel Batch Approval -->
+        <section class="posts reel-approval" id="reelApproval">
+            <div class="section-heading">
+                <div>
+                    <h2>✅ Reel Batch Approval</h2>
+                    <p>Preview your generated Reels and approve or reject the complete batch.</p>
+                </div>
+                <span class="local-label">HUMAN REVIEW</span>
+            </div>
+            <div class="batch-toolbar">
+                <label for="batchSelect">Generated batch</label>
+                <select id="batchSelect"><option value="">Loading batches...</option></select>
+                <button type="button" id="refreshBatchesBtn" onclick="loadReelBatches()">↻ Refresh</button>
+            </div>
+            <p id="batchMessage" class="batch-message" aria-live="polite">Loading your Reel batches...</p>
+            <div id="batchSummary" class="batch-summary"></div>
+            <div id="reelBatchList" class="reel-batch-grid"></div>
+            <div class="batch-actions">
+                <button type="button" id="approveBatchBtn" class="approve-btn" onclick="approveReelBatch()" disabled>✓ Approve All 6 Reels</button>
+                <button type="button" id="rejectBatchBtn" class="reject-btn" onclick="rejectReelBatch()" disabled>✕ Reject Entire Batch</button>
+            </div>
+            <small class="approval-note">Approval only marks the videos as approved in your local system. It does not publish them to Instagram.</small>
+        </section>
+
+        <!-- My Posts -->
+        <section class="posts" id="posts">
+
+            <h2>My Content</h2>
+
+            <p>Your generated posts will appear here after saving.</p>
+
+            <div id="postList"></div>
+
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            Instagram AI Studio · Built with FastAPI and Ollama
+        </footer>
+
+    </main>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
