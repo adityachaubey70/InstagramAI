@@ -1,3 +1,6 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()
 from fastapi import BackgroundTasks
 from voiceover import generate_voiceover
 from fastapi.staticfiles import StaticFiles
@@ -21,6 +24,8 @@ import requests
 import sqlite3
 import zipfile
 import uuid
+import cloudinary
+from cloudinary.uploader import upload
 from fastapi.responses import FileResponse
 from datetime import datetime
 
@@ -53,6 +58,13 @@ MODEL = "qwen2.5:3b"
 # Database location
 DB_PATH = Path(__file__).resolve().parent / "instagram.db"
 
+# Cloudinary configuration
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+    secure=True
+)
 
 # Database connection
 def get_db():
@@ -103,6 +115,23 @@ def init_db():
             )
         """)
 
+        # Add Cloudinary URL column if it does not exist
+        columns = [
+            row["name"]
+            for row in connection.execute(
+                "PRAGMA table_info(reels)"
+            ).fetchall()
+        ]
+
+        if "cloudinary_url" not in columns:
+            connection.execute(
+                "ALTER TABLE reels ADD COLUMN cloudinary_url TEXT"
+            )
+                    # Store Instagram publishing container ID
+        if "instagram_container_id" not in columns:
+            connection.execute(
+                "ALTER TABLE reels ADD COLUMN instagram_container_id TEXT"
+            )
 init_db()
 # Create a new Reel batch
 
@@ -536,6 +565,9 @@ class ReelRequest(BaseModel):
     duration: int = 30
     language: str = "English"
 
+class CreateInstagramContainerRequest(BaseModel):
+    caption: str | None = None
+    share_to_feed: bool = True
 
 @app.post("/generate-reel-script")
 def generate_reel_script(data: ReelRequest):
@@ -990,3 +1022,390 @@ def start_batch_generation(
         "batch_id": data.batch_id,
         "status": "generating"
     }
+# ==========================================
+# InstaAI - Upload Approved Reel to Cloudinary
+# ==========================================
+
+@app.post("/reels/{reel_id}/upload-cloudinary")
+def upload_reel_to_cloudinary(reel_id: int):
+
+    try:
+        # Find the Reel in the database
+        with get_db() as connection:
+            reel = connection.execute(
+                "SELECT * FROM reels WHERE id = ?",
+                (reel_id,)
+            ).fetchone()
+
+            if reel is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Reel not found."
+                )
+
+            if reel["status"] != "approved":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Only approved Reels can be uploaded."
+                )
+
+            # Avoid uploading the same Reel twice
+            if reel["cloudinary_url"]:
+                return {
+                    "success": True,
+                    "message": "Reel is already uploaded.",
+                    "cloudinary_url": reel["cloudinary_url"]
+                }
+
+            video_path = Path(reel["video_path"]).resolve()
+
+            # Ensure video belongs to the project's media folder
+            if not video_path.is_relative_to(MEDIA_DIR.resolve()):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid video path."
+                )
+
+            if not video_path.is_file() or video_path.suffix.lower() != ".mp4":
+                raise HTTPException(
+                    status_code=404,
+                    detail="Reel video file not found."
+                )
+
+        # Upload video to Cloudinary
+        result = upload(
+            str(video_path),
+            resource_type="video",
+            folder="instaai/reels",
+            public_id=f"reel_{reel_id}",
+            overwrite=True
+        )
+
+        public_url = result["secure_url"]
+
+        # Save Cloudinary URL in database
+        with get_db() as connection:
+            connection.execute(
+                "UPDATE reels SET cloudinary_url = ? WHERE id = ?",
+                (public_url, reel_id)
+            )
+
+        return {
+            "success": True,
+            "message": "Reel uploaded to Cloudinary successfully.",
+            "reel_id": reel_id,
+            "cloudinary_url": public_url
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Cloudinary upload failed: {str(error)}"
+        )
+@app.post("/reels/{reel_id}/create-instagram-container")
+def create_instagram_container(
+    reel_id: int,
+    data: CreateInstagramContainerRequest
+):
+    access_token = os.getenv("INSTAGRAM_PAGE_ACCESS_TOKEN")
+    ig_user_id = os.getenv("INSTAGRAM_USER_ID")
+    api_version = os.getenv("META_API_VERSION", "v26.0")
+
+    if not access_token or not ig_user_id:
+        raise HTTPException(
+            status_code=500,
+            detail="Instagram credentials are missing from .env"
+        )
+
+    connection = get_db()
+
+    reel = connection.execute(
+        """
+        SELECT id, status, cloudinary_url, narration,
+               instagram_container_id
+        FROM reels
+        WHERE id = ?
+        """,
+        (reel_id,)
+    ).fetchone()
+
+    if not reel:
+        connection.close()
+        raise HTTPException(status_code=404, detail="Reel not found")
+
+    if reel["status"] != "approved":
+        connection.close()
+        raise HTTPException(
+            status_code=400,
+            detail="Only approved Reels can be sent to Instagram"
+        )
+
+    video_url = reel["cloudinary_url"]
+
+    if not video_url or not video_url.startswith(
+        "https://res.cloudinary.com/"
+    ):
+        connection.close()
+        raise HTTPException(
+            status_code=400,
+            detail="A valid Cloudinary video URL is required"
+        )
+
+    if reel["instagram_container_id"]:
+        connection.close()
+        raise HTTPException(
+            status_code=409,
+            detail="An Instagram container already exists for this Reel"
+        )
+
+    caption = data.caption or reel["narration"]
+
+    url = (
+        f"https://graph.facebook.com/{api_version}/"
+        f"{ig_user_id}/media"
+    )
+
+    payload = {
+        "media_type": "REELS",
+        "video_url": video_url,
+        "caption": caption,
+        "share_to_feed": str(data.share_to_feed).lower(),
+        "access_token": access_token
+    }
+
+    try:
+        response = requests.post(
+            url,
+            data=payload,
+            timeout=60
+        )
+
+        result = response.json()
+
+        if not response.ok or "id" not in result:
+            raise HTTPException(
+                status_code=502,
+                detail=result.get("error", {}).get(
+                    "message", "Instagram container creation failed"
+                )
+            )
+
+        container_id = result["id"]
+
+        connection.execute(
+            """
+            UPDATE reels
+            SET instagram_container_id = ?
+            WHERE id = ?
+            """,
+            (container_id, reel_id)
+        )
+
+        connection.commit()
+
+        return {
+            "success": True,
+            "reel_id": reel_id,
+            "instagram_container_id": container_id,
+            "message": "Instagram container created successfully. Reel not published."
+        }
+
+    except requests.RequestException:
+        raise HTTPException(
+            status_code=502,
+            detail="Could not connect to Instagram API"
+        )
+
+    finally:
+        connection.close()
+@app.get("/reels/{reel_id}/instagram-container-status")
+def check_instagram_container_status(reel_id: int):
+
+    access_token = os.getenv("INSTAGRAM_PAGE_ACCESS_TOKEN")
+    api_version = os.getenv("META_API_VERSION", "v26.0")
+
+    if not access_token:
+        raise HTTPException(
+            status_code=500,
+            detail="Instagram access token is missing"
+        )
+
+    connection = get_db()
+
+    try:
+        reel = connection.execute(
+            """
+            SELECT instagram_container_id
+            FROM reels
+            WHERE id = ?
+            """,
+            (reel_id,)
+        ).fetchone()
+
+        if not reel:
+            raise HTTPException(
+                status_code=404,
+                detail="Reel not found"
+            )
+
+        container_id = reel["instagram_container_id"]
+
+        if not container_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Instagram container has not been created"
+            )
+
+        url = (
+            f"https://graph.facebook.com/{api_version}/"
+            f"{container_id}"
+        )
+
+        response = requests.get(
+            url,
+            params={
+                "fields": "status_code,status",
+                "access_token": access_token
+            },
+            timeout=30
+        )
+
+        result = response.json()
+
+        if not response.ok:
+            raise HTTPException(
+                status_code=502,
+                detail=result.get("error", {}).get(
+                    "message",
+                    "Instagram status check failed"
+                )
+            )
+
+        return {
+            "reel_id": reel_id,
+            "container_id": container_id,
+            "status_code": result.get("status_code"),
+            "status": result.get("status"),
+            "ready_to_publish": (
+                result.get("status_code") == "FINISHED"
+            )
+        }
+
+    finally:
+        connection.close()
+@app.post("/reels/{reel_id}/publish-instagram")
+def publish_instagram_reel(reel_id: int):
+
+    access_token = os.getenv("INSTAGRAM_PAGE_ACCESS_TOKEN")
+    ig_user_id = os.getenv("INSTAGRAM_USER_ID")
+    api_version = os.getenv("META_API_VERSION", "v26.0")
+
+    if not access_token or not ig_user_id:
+        raise HTTPException(
+            status_code=500,
+            detail="Instagram credentials are missing"
+        )
+
+    connection = get_db()
+
+    try:
+        reel = connection.execute(
+            """
+            SELECT id, status, instagram_container_id, published_at
+            FROM reels
+            WHERE id = ?
+            """,
+            (reel_id,)
+        ).fetchone()
+
+        if not reel:
+            raise HTTPException(status_code=404, detail="Reel not found")
+
+        if reel["status"] != "approved":
+            raise HTTPException(
+                status_code=400,
+                detail="Only approved Reels can be published"
+            )
+
+        if reel["published_at"]:
+            raise HTTPException(
+                status_code=409,
+                detail="This Reel has already been published"
+            )
+
+        container_id = reel["instagram_container_id"]
+
+        if not container_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Instagram container has not been created"
+            )
+
+        base_url = f"https://graph.facebook.com/{api_version}"
+
+        status_response = requests.get(
+            f"{base_url}/{container_id}",
+            params={
+                "fields": "status_code",
+                "access_token": access_token
+            },
+            timeout=30
+        )
+
+        status_result = status_response.json()
+
+        if not status_response.ok:
+            raise HTTPException(
+                status_code=502,
+                detail="Could not verify Instagram processing status"
+            )
+
+        if status_result.get("status_code") != "FINISHED":
+            raise HTTPException(
+                status_code=400,
+                detail="Instagram has not finished processing this Reel"
+            )
+
+        publish_response = requests.post(
+            f"{base_url}/{ig_user_id}/media_publish",
+            data={
+                "creation_id": container_id,
+                "access_token": access_token
+            },
+            timeout=60
+        )
+
+        publish_result = publish_response.json()
+
+        if not publish_response.ok or "id" not in publish_result:
+            raise HTTPException(
+                status_code=502,
+                detail=publish_result.get("error", {}).get(
+                    "message", "Instagram publishing failed"
+                )
+            )
+
+        connection.execute(
+            """
+            UPDATE reels
+            SET status = 'published',
+                published_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (reel_id,)
+        )
+
+        connection.commit()
+
+        return {
+            "success": True,
+            "reel_id": reel_id,
+            "instagram_media_id": publish_result["id"],
+            "message": "Reel published successfully"
+        }
+
+    finally:
+        connection.close()
